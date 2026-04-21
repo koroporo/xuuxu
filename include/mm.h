@@ -169,6 +169,7 @@ int MEMPHY_read(struct memphy_struct * mp, addr_t addr, BYTE *value);
 int MEMPHY_write(struct memphy_struct * mp, addr_t addr, BYTE data);
 int MEMPHY_dump(struct memphy_struct * mp);
 int init_memphy(struct memphy_struct *mp, addr_t max_size, int randomflg);
+int MEMPHY_get_continuous_freefp(struct memphy_struct* mp, int req_pgnum, struct framephy_struct** ret_frm_list);
 
 /* print list */
 int print_list_fp(struct framephy_struct *fp);

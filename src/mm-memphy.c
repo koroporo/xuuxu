@@ -220,5 +220,95 @@ int init_memphy(struct memphy_struct *mp, addr_t max_size, int randomflg)
 
    return 0;
 }
+/*
+ * MEMPHY_get_continuous_freefp: find and get a continuous frames inside the physical memory (kernel use)
+   @mp: memory device 
+   @req_pgnum: # of pages required
+   @ret_frm_list: list of continuous frames
+
+*/
+ int MEMPHY_get_continuous_freefp(struct memphy_struct* mp, int req_pgnum, struct framephy_struct** ret_frm_list)
+ {
+    if (mp == NULL || req_pgnum <= 0)
+         return -1;
+
+    int fpnum = mp->maxsz/PAGING_PAGESZ;
+
+    if (fpnum <= 0)
+         return -1;
+
+    BYTE *freefp_table = (BYTE *)calloc(fpnum, sizeof(BYTE));
+
+    struct framephy_struct* head = mp->free_fp_list;
+
+    while (head)
+    {
+      freefp_table[head->fpn] = 1;
+      head = head->fp_next;
+    }
+
+    int start_fpn = -1;
+    int pgnum = req_pgnum;
+    int iter;
+    for (iter = 0; iter < fpnum; iter++)
+    {
+         if (freefp_table[iter] == 1)
+         {
+            if (pgnum == req_pgnum)
+            {
+               start_fpn = iter;
+            }
+            pgnum--;
+            if (pgnum == 0)  
+               break;
+         }
+         else 
+         {
+            pgnum = req_pgnum;
+            start_fpn = -1;
+         }
+    }
+
+    free(freefp_table);
+
+    if (pgnum > 0)
+         return -1;
+
+    struct framephy_struct **sorted_nodes = (struct framephy_struct **)malloc(sizeof(struct framephy_struct *) * req_pgnum);
+    struct framephy_struct *prev = NULL;
+    struct framephy_struct *free_ptr = mp->free_fp_list;
+
+    while (free_ptr)
+    {
+      if (free_ptr->fpn >= start_fpn && free_ptr->fpn < start_fpn + req_pgnum)
+      {
+         if (prev) {
+               prev->fp_next = free_ptr->fp_next;
+         } else {
+               mp->free_fp_list = free_ptr->fp_next;
+         }
+
+         int offset = free_ptr->fpn - start_fpn;
+         sorted_nodes[offset] = free_ptr;
+
+         free_ptr = free_ptr->fp_next;
+      }
+      else 
+      {
+         prev = free_ptr;
+         free_ptr = free_ptr->fp_next;
+      }
+    }
+
+    for (int i = 0; i < req_pgnum - 1; i++) {
+        sorted_nodes[i]->fp_next = sorted_nodes[i + 1];
+    }
+    sorted_nodes[req_pgnum - 1]->fp_next = NULL; 
+
+    *ret_frm_list = sorted_nodes[0]; 
+    
+    free(sorted_nodes);
+    return 0;
+ }
 
 // #endif
