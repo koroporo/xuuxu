@@ -98,6 +98,12 @@
 #define INCLUDE(x1,x2,y1,y2) ((x1) <= (y1) && (y2) <= (x2))
 #define OVERLAP(x1,x2,y1,y2) ((x1) < (y2) && (y1) < (x2))
 
+#define MASKING_USR_KRNL_BITS(x) ((x) >> 57)
+#define IS_USER_SPACE(x) ((MASKING_USR_KRNL_BITS(x)) == 0x00)
+#define IS_KRNL_SPACE(x)    ((MASKING_USR_KRNL_BITS(x)) == 0x7F)
+#define USERMODEBIT(x) ((x) == 1)
+#define KERNELMODEBIT(x) ((x) == 0)
+
 /* VM region prototypes */
 addr_t vm_map_ram(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t mapstart, int incpgnum, struct vm_rg_struct *ret_rg);
 struct vm_rg_struct * init_vm_rg(addr_t rg_start, addr_t rg_end);

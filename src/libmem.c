@@ -30,6 +30,7 @@ static pthread_mutex_t mmvm_lock = PTHREAD_MUTEX_INITIALIZER;
  *@mm: memory region
  *@rg_elmt: new region
  *
+ * (usr and krnl)
  */
 int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct *rg_elmt)
 {
@@ -50,7 +51,7 @@ int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct *rg_elmt)
 /*get_symrg_byid - get mem region by region ID
  *@mm: memory region
  *@rgid: region ID act as symbol index of variable
- *
+ * (usr and krnl)
  */
 struct vm_rg_struct *get_symrg_byid(struct mm_struct *mm, int rgid)
 {
@@ -66,21 +67,25 @@ struct vm_rg_struct *get_symrg_byid(struct mm_struct *mm, int rgid)
  *@rgid: memory region ID (used to identify variable in symbole table)
  *@size: allocated size
  *@alloc_addr: address of allocated memory region
- *
+ * (usr),  converted from caller->krnl->mm to caller->mm
+ *          _syscall(krnl_t,...)
  */
 int __alloc(struct pcb_t *caller, int vmaid, int rgid, addr_t size, addr_t *alloc_addr)
 {
   /*Allocate at the toproof */
   pthread_mutex_lock(&mmvm_lock);
   struct vm_rg_struct rgnode;
-  struct vm_area_struct *cur_vma = get_vma_by_num(caller->krnl->mm, vmaid);
+
+  struct vm_area_struct *cur_vma = get_vma_by_num(caller->mm, vmaid);
+  
   int inc_sz=0;
 
   if (get_free_vmrg_area(caller, vmaid, size, &rgnode) == 0)
   {
-    caller->krnl->mm->symrgtbl[rgid].rg_start = rgnode.rg_start;
-    caller->krnl->mm->symrgtbl[rgid].rg_end = rgnode.rg_end;
- 
+    caller->mm->symrgtbl[rgid].rg_start = rgnode.rg_start;
+    caller->mm->symrgtbl[rgid].rg_end = rgnode.rg_end;
+    caller->mm->symrgtbl[rgid].mode_bit = 1;
+    // NEW: User mode: U/S bit = 1
     *alloc_addr = rgnode.rg_start;
 
     pthread_mutex_unlock(&mmvm_lock);
@@ -116,10 +121,16 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, addr_t size, addr_t *allo
   _syscall(caller->krnl, caller->pid, 17, &regs); /* SYSCALL 17 sys_memmap */
 
   /*Successful increase limit */
-  caller->krnl->mm->symrgtbl[rgid].rg_start = old_sbrk;
-  caller->krnl->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
-
+  caller->mm->symrgtbl[rgid].rg_start = old_sbrk;
+  caller->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
+  // NEW: User mode: U/S bit = 1
+  caller->mm->symrgtbl[rgid].mode_bit = 1;
+    
   *alloc_addr = old_sbrk;
+
+
+
+ 
 
   pthread_mutex_unlock(&mmvm_lock);
   return 0;
@@ -144,7 +155,7 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
   }
 
   /* TODO: Manage the collect freed region to freerg_list */
-  struct vm_rg_struct *rgnode = get_symrg_byid(caller->krnl->mm, rgid);
+  struct vm_rg_struct *rgnode = get_symrg_byid(caller->mm, rgid);
 
   if (rgnode->rg_start == 0 && rgnode->rg_end == 0)
   {
@@ -352,14 +363,14 @@ int pg_setval(struct mm_struct *mm, int addr, BYTE value, struct pcb_t *caller)
  *@offset: offset to acess in memory region
  *@rgid: memory region ID (used to identify variable in symbole table)
  *@size: allocated size
- *
- */
+ * 
+ */ 
 int __read(struct pcb_t *caller, int vmaid, int rgid, addr_t offset, BYTE *data)
 {
  pthread_mutex_lock(&mmvm_lock);
-  struct vm_rg_struct *currg = get_symrg_byid(caller->krnl->mm, rgid);
-  struct vm_area_struct *cur_vma = get_vma_by_num(caller->krnl->mm, vmaid);
-
+  struct vm_rg_struct *currg = get_symrg_byid(caller->mm, rgid);
+  struct vm_area_struct *cur_vma = get_vma_by_num(caller->mm, vmaid);
+  
   /* TODO Invalid memory identify */
   if (currg == NULL || cur_vma == NULL)
   {
@@ -377,7 +388,7 @@ int __read(struct pcb_t *caller, int vmaid, int rgid, addr_t offset, BYTE *data)
     pthread_mutex_unlock(&mmvm_lock);
     return -1;
   }
-  if(pg_getval(caller->krnl->mm, currg->rg_start + offset, data, caller) == -1)
+  if(pg_getval(caller->mm, currg->rg_start + offset, data, caller) == -1)
   {
     pthread_mutex_unlock(&mmvm_lock);
     return -1;
@@ -397,9 +408,10 @@ int libread(
 {
   BYTE data;
   printf("%s:%d\n",__func__,__LINE__);
-  addr_t krnl_mask = (0x7FUL << 57); 
-  if ((offset & krnl_mask) == 0) 
-      return -1; //user space cannot enter krnl addr
+
+  if (!IS_USER_SPACE(offset+proc->regs[source])) 
+      return -1; 
+
   int val = __read(proc, 0, source, offset, &data);
 
   *destination = data;
@@ -425,9 +437,9 @@ int libread(
 int __write(struct pcb_t *caller, int vmaid, int rgid, addr_t offset, BYTE value)
 {
   pthread_mutex_lock(&mmvm_lock);
-  struct vm_rg_struct *currg = get_symrg_byid(caller->krnl->mm, rgid);
+  struct vm_rg_struct *currg = get_symrg_byid(caller->mm, rgid);
 
-  struct vm_area_struct *cur_vma = get_vma_by_num(caller->krnl->mm, vmaid);
+  struct vm_area_struct *cur_vma = get_vma_by_num(caller->mm, vmaid);
 
   if (currg == NULL || cur_vma == NULL) /* Invalid memory identify */
   {
@@ -450,9 +462,8 @@ int libwrite(
 {
 
   addr_t address = proc->regs[destination] + offset;
-  addr_t krnl_mask = (0x7FUL << 57);
-  if ((address & krnl_mask) == 0) 
-      return -1; //user space cannot enter krnl addr
+  if (!IS_USER_SPACE(address)) 
+      return -1;
   int val = __write(proc, 0, destination, offset, data);
   if (val == -1)
   {
@@ -625,6 +636,19 @@ int libkmem_copy_from_user(struct pcb_t *caller, uint32_t source, uint32_t desti
    */
   //__read_user_mem(...)
   //__write_kernel_mem(...);
+  BYTE data;
+
+  for (uint32_t i = 0; i < size; i++)
+  {
+    if (__read_user_mem(caller, 0, source, offset + i, &data) != 0)
+    {
+      return -1;
+    }
+    if (__write_kernel_mem(caller, 0, destination, offset + i, &data) != 0)
+    {
+      return -1;
+    }
+  }
 
   return 0;
 }
@@ -638,8 +662,21 @@ int libkmem_copy_to_user(struct pcb_t *caller, uint32_t source, uint32_t destina
    */
   //__read_kernel_mem(...)
   //__write_user_mem(...);
+  BYTE data;
 
-  return 1;
+  for (uint32_t i = 0; i < size; i++)
+  {
+    if (__read_kernel_mem(caller, 0, source, offset + i, &data) != 0)
+    {
+      return -1;
+    }
+    if (__write_user_mem(caller, 0, destination, offset + i, &data) != 0)
+    {
+      return -1;
+    }
+  }
+
+  return 0;
 }
 
 
@@ -652,10 +689,30 @@ int libkmem_copy_to_user(struct pcb_t *caller, uint32_t source, uint32_t destina
  */
 int __read_kernel_mem(struct pcb_t *caller, int vmaid, int rgid, addr_t offset, BYTE *data)
 {
+
   /* TODO: provide OS memory operator for kernel memory region */
   //krnl->krnl_pgd ... or krnl->pgd ... based on kmem implementation strategy
+  
+  struct vm_rg_struct * currg = get_symrg_byid(caller->krnl->mm, rgid);
+  if (!currg) return -1;
+  addr_t knrl_addr = currg->rg_start + offset;
+  int pgn = PAGING_PGN(knrl_addr);
+  int off = PAGING_OFFST(knrl_addr);
 
-  return 0;
+  uint32_t pte = caller->krnl->krnl_pgd[pgn];
+  if (!PAGING_PAGE_PRESENT(pte)) 
+  {
+        return -1; // Kernel page missing (fatal error in kernel space)
+  }
+
+  int krnl_fpn = PAGING_FPN(pte);
+  addr_t phyaddr = (krnl_fpn * PAGING_PAGESZ) + off;
+  if (!IS_KRNL_SPACE(phyaddr))
+  {
+    return -1;
+  }
+  return MEMPHY_read(caller->krnl->mram, phyaddr, data);
+
 }
 
 /*__write_kernel_mem - write a kernel region memory
@@ -669,8 +726,26 @@ int __write_kernel_mem(struct pcb_t *caller, int vmaid, int rgid, addr_t offset,
 {
   /* TODO: provide OS memory operator for kernel memory region */
   //krnl->krnl_pgd ... or krnl->pgd ... based on kmem implementation strategy
+  struct vm_rg_struct *currg = get_symrg_byid(caller->krnl->mm, rgid);
+  if (!currg) return -1;
 
-  return 0;
+  addr_t krnl_addr = currg->rg_start + offset;
+  int pgn = PAGING_PGN(krnl_addr);
+  int off = PAGING_OFFST(krnl_addr);
+
+  uint32_t pte = caller->krnl->krnl_pgd[pgn];
+  if (!PAGING_PAGE_PRESENT(pte)) return -1;
+
+  int krnl_fpn = PAGING_FPN(pte);
+
+  addr_t phyaddr = (krnl_addr * PAGING_PAGESZ) + off;
+
+  if (!IS_KRNL_SPACE(phyaddr))
+  {
+    return -1;
+  }
+
+  return MEMPHY_write(caller->krnl->mram, phyaddr, value);
 }
 
 /*__read_user_mem - read value in user region memory
@@ -684,8 +759,24 @@ int __read_user_mem(struct pcb_t *caller, int vmaid, int rgid, addr_t offset, BY
 {
   /* TODO: provide OS level management user memory access */
   //krnl->pgd ...
+  struct vm_rg_struct * currg = get_symrg_byid(caller->mm, rgid);
+  if (!currg) return -1;
+  addr_t addr = currg->rg_start + offset;
+  int pgn = PAGING_PGN(addr);
+  int off = PAGING_OFFST(addr);
 
-   return 0;
+  int fpn;
+
+  if (pg_getpage(caller->mm, pgn, &fpn, caller) != 0) return -1;
+
+  addr_t phyaddr = (fpn * PAGING_PAGESZ) + off;
+  if (!IS_USER_SPACE(addr))
+  {
+    return -1;
+  }
+
+  return MEMPHY_read(caller->krnl->mram, phyaddr, data);
+
 }
 
 
@@ -700,8 +791,25 @@ int __write_user_mem(struct pcb_t *caller, int vmaid, int rgid, addr_t offset, B
 {
   /* TODO: provide OS level management user memory access */
   //krnl->pgd ...
+  struct vm_rg_struct *currg = get_symrg_byid(caller->mm, rgid);
+  if (!currg) return -1;
+  
+  addr_t addr = currg->rg_start + offset;
 
-  return 0;
+  if (!IS_USER_SPACE(addr))
+  {
+    return -1;
+  }
+
+  int pgn = PAGING_PGN(addr);
+  int off = PAGING_OFFST(addr);
+
+  int fpn;
+  if (pg_getpage(caller->mm, pgn, &fpn, caller) != 0) {
+    return -1;
+  }
+  addr_t phyaddr = (fpn * PAGING_PAGESZ) + off;
+  return MEMPHY_write(caller->krnl->mram, phyaddr, value);
 }
 
 

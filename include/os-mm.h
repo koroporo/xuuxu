@@ -58,6 +58,8 @@ struct vm_rg_struct {
    addr_t rg_start;
    addr_t rg_end;
 
+   unsigned long mode_bit;
+
    struct vm_rg_struct *rg_next;
 };
 
