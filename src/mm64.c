@@ -108,7 +108,7 @@ int get_pd_from_pagenum(addr_t pgn, addr_t *pgd, addr_t *p4d, addr_t *pud, addr_
  */
 int pte_set_swap(struct pcb_t *caller, addr_t pgn, int swptyp, addr_t swpoff)
 {
-	struct mm_struct *mm = caller->krnl->mm;
+	struct mm_struct *mm = caller->mm;
 	addr_t pgd_idx, p4d_idx, pud_idx, pmd_idx, pt_idx;
 
 	get_pd_from_pagenum(pgn, &pgd_idx, &p4d_idx, &pud_idx, &pmd_idx, &pt_idx);
@@ -169,7 +169,7 @@ int pte_set_swap(struct pcb_t *caller, addr_t pgn, int swptyp, addr_t swpoff)
  */
 int pte_set_fpn(struct pcb_t *caller, addr_t pgn, addr_t fpn)
 {
-	struct mm_struct *mm = caller->krnl->mm;
+	struct mm_struct *mm = caller->mm;
 	addr_t pgd_idx, p4d_idx, pud_idx, pmd_idx, pt_idx;
 
 	get_pd_from_pagenum(pgn, &pgd_idx, &p4d_idx, &pud_idx, &pmd_idx, &pt_idx);
@@ -229,7 +229,7 @@ int pte_set_fpn(struct pcb_t *caller, addr_t pgn, addr_t fpn)
  **/
 uint32_t pte_get_entry(struct pcb_t *caller, addr_t pgn)
 {
-	struct mm_struct *mm = caller->krnl->mm;
+	struct mm_struct *mm = caller->mm;
 	addr_t pgd_idx, p4d_idx, pud_idx, pmd_idx, pt_idx;
 
 	get_pd_from_pagenum(pgn, &pgd_idx, &p4d_idx, &pud_idx, &pmd_idx, &pt_idx);
@@ -260,11 +260,27 @@ uint32_t pte_get_entry(struct pcb_t *caller, addr_t pgn)
  **/
 int pte_set_entry(struct pcb_t *caller, addr_t pgn, uint32_t pte_val)
 {
-	struct krnl_t *krnl = caller->krnl;
-	krnl->mm->pgd[pgn] = pte_val;
+	struct mm_struct *mm = caller->mm;
+	addr_t pgd_idx, p4d_idx, pud_idx, pmd_idx, pt_idx;
 
+	get_pd_from_pagenum(pgn, &pgd_idx, &p4d_idx, &pud_idx, &pmd_idx, &pt_idx);
+
+	if (mm->pgd == NULL || mm->pgd[pgd_idx] == 0)
+		return -1;
+	addr_t *p4d = (addr_t *)(mm->pgd[pgd_idx]);
+	if (p4d[p4d_idx] == 0)
+		return -1;
+	addr_t *pud = (addr_t *)(p4d[p4d_idx]);
+	if (pud[pud_idx] == 0)
+		return -1;
+	addr_t *pmd = (addr_t *)(pud[pud_idx]);
+	if (pmd[pmd_idx] == 0)
+		return -1;
+	addr_t *pt = (addr_t *)(pmd[pmd_idx]);
+
+	pt[pt_idx] = pte_val;
 	return 0;
-} // Check coi có làm 5 lớp hay ko
+}
 
 /*
  * vmap_pgd_memset - map a range of page at aligned address
@@ -287,7 +303,7 @@ int vmap_pgd_memset(struct pcb_t *caller, // process call
 		addr_t pgd_idx, p4d_idx, pud_idx, pmd_idx, pt_idx;
 		get_pd_from_pagenum(pgn, &pgd_idx, &p4d_idx, &pud_idx, &pmd_idx, &pt_idx);
 
-		addr_t *p4d = (addr_t *)(caller->krnl->mm->pgd[pgd_idx]);
+		addr_t *p4d = (addr_t *)(caller->mm->pgd[pgd_idx]);
 		addr_t *pud = (addr_t *)(p4d[p4d_idx]);
 		addr_t *pmd = (addr_t *)(pud[pud_idx]);
 		addr_t *pt = (addr_t *)(pmd[pmd_idx]);
@@ -303,7 +319,7 @@ int vmap_pgd_memset(struct pcb_t *caller, // process call
 addr_t vmap_page_range(struct pcb_t *caller,		   // process call
 					   addr_t addr,					   // start address which is aligned to pagesz
 					   int pgnum,					   // num of mapping page
-					   struct framephy_struct *frames, // list of the mapped frames
+					   struct framephy_struct *frames, // list of the mapped frames	
 					   struct vm_rg_struct *ret_rg)	   // return mapped region, the real mapped fp
 {													   // no guarantee all given pages are mapped
 													   // struct framephy_struct *fpit;
@@ -330,7 +346,7 @@ addr_t vmap_page_range(struct pcb_t *caller,		   // process call
 		pte_set_fpn(caller, pgn, fpit->fpn);
 
 		// To track FIFO, maybe
-		enlist_pgn_node(&caller->krnl->mm->fifo_pgn, pgn);
+		enlist_pgn_node(&caller->mm->fifo_pgn, pgn);
 
 		fpit = fpit->fp_next;
 	}
@@ -354,7 +370,7 @@ addr_t alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_st
 	for (pgit = 0; pgit < req_pgnum; pgit++)
 	{
 		// Mram -> free physical page?
-		if (MEMPHY_get_freefp(caller->krnl->mram, &fpn) == 0)
+		if (MEMPHY_get_freefp(caller->krnl->mram, &fpn) == 0) // check
 		{
 			struct framephy_struct *newfp_str = malloc(sizeof(struct framephy_struct));
 			newfp_str->fpn = fpn;
@@ -390,10 +406,6 @@ addr_t alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_st
  */
 addr_t vm_map_ram(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t mapstart, int incpgnum, struct vm_rg_struct *ret_rg)
 {
-	struct framephy_struct *frm_lst = NULL;
-	addr_t ret_alloc = 0;
-	// int pgnum = incpgnum;
-
 	/*@bksysnet: author provides a feasible solution of getting frames
 	 *FATAL logic in here, wrong behaviour if we have not enough page
 	 *i.e. we request 1000 frames meanwhile our RAM has size of 3 frames
@@ -401,7 +413,11 @@ addr_t vm_map_ram(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t mapst
 	 *in endless procedure of swap-off to get frame and we have not provide
 	 *duplicate control mechanism, keep it simple
 	 */
-	// ret_alloc = alloc_pages_range(caller, pgnum, &frm_lst);
+	struct framephy_struct *frm_lst = NULL;
+	addr_t ret_alloc = 0;
+	int pgnum = incpgnum;
+
+	ret_alloc = alloc_pages_range(caller, pgnum, &frm_lst);
 
 	if (ret_alloc < 0 && ret_alloc != -3000)
 		return -1;
@@ -415,7 +431,6 @@ addr_t vm_map_ram(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t mapst
 	/* it leaves the case of memory is enough but half in ram, half in swap
 	 * do the swaping all to swapper to get the all in ram */
 	vmap_page_range(caller, mapstart, incpgnum, frm_lst, ret_rg);
-
 	return 0;
 }
 
@@ -611,7 +626,29 @@ int print_pgtbl(struct pcb_t *caller, addr_t start, addr_t end)
 	get_pd_from_address(start, &pgd, &p4d, &pud, &pmd, &pt);
 
 	/* TODO traverse the page map and dump the page directory entries */
+	printf("print_pgtbl:\n");
 
+	struct mm_struct *mm = caller->mm;
+	if (mm == NULL || mm->pgd == NULL) {
+		return 0;
+	}
+
+	addr_t pdg_val = mm->pgd[pgd];
+	addr_t p4g_val = 0;
+	addr_t pud_val = 0;
+	addr_t pmd_val = 0;
+
+	if (pdg_val != 0) {
+		p4g_val = ((addr_t *)pdg_val)[p4d];
+	}
+	if (p4g_val != 0) {
+		pud_val = ((addr_t *)p4g_val)[pud];
+	}
+	if (pud_val != 0) {
+		pmd_val = ((addr_t *)pud_val)[pmd];
+	}
+
+	printf("PGD=%lx P4D=%lx PUD=%lx PMD=%lx\n", pdg_val, p4g_val, pud_val, pmd_val);
 	return 0;
 }
 
