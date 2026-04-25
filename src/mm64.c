@@ -79,20 +79,11 @@ int init_pte(addr_t *pte,
  */
 int get_pd_from_address(addr_t addr, addr_t *pgd, addr_t *p4d, addr_t *pud, addr_t *pmd, addr_t *pt)
 {
-	/* Extract page direactories */
-	*pgd = (addr & PAGING64_ADDR_PGD_MASK) >> PAGING64_ADDR_PGD_LOBIT;
-	*p4d = (addr & PAGING64_ADDR_P4D_MASK) >> PAGING64_ADDR_P4D_LOBIT;
-	*pud = (addr & PAGING64_ADDR_PUD_MASK) >> PAGING64_ADDR_PUD_LOBIT;
-	*pmd = (addr & PAGING64_ADDR_PMD_MASK) >> PAGING64_ADDR_PMD_LOBIT;
-	*pt = (addr & PAGING64_ADDR_PT_MASK) >> PAGING64_ADDR_PT_LOBIT;
 	*pgd = PAGING64_ADDR_PGD(addr);
 	*p4d = PAGING64_ADDR_P4D(addr);
 	*pud = PAGING64_ADDR_PUD(addr);
 	*pmd = PAGING64_ADDR_PMD(addr);
 	*pt  = PAGING64_ADDR_PT(addr);
-
-	/* TODO: implement the page direactories mapping */
-
 	return 0;
 }
 
