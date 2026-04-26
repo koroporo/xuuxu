@@ -19,6 +19,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
+
+#if defined (MM64)
+	#include "mm64.h"
+#endif
 // addr_t vm_map_ram(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t mapstart, int incpgnum, struct vm_rg_struct *ret_rg);
 /*get_vma_by_num - get vm area by numID
  *@mm: memory region
@@ -181,8 +185,13 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, addr_t inc_sz)
 	{
 		return -1;
 	}
+	#if defined (MM64)
+	inc_amt = PAGING64_PAGE_ALIGNSZ(inc_sz);
+	incnumpage = inc_amt / PAGING64_PAGESZ;
+	#else
 	inc_amt = PAGING_PAGE_ALIGNSZ(inc_sz);
 	incnumpage = inc_amt / PAGING_PAGESZ;
+	#endif
 	area = get_vm_area_node_at_brk(caller, vmaid, inc_sz, inc_amt);
 	if (area == NULL)
 	{
@@ -232,7 +241,11 @@ addr_t vm_map_range(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t map
 	{
 		return -1;
 	}
+	#if defined (MM64)
+	mapsz = (addr_t)incpgnum * PAGING64_PAGESZ;
+	#else
 	mapsz = (addr_t)incpgnum * PAGING_PAGESZ;
+	#endif
 	if (mapstart < astart || (mapstart + mapsz) > aend)
 	{
 		return -1;
@@ -267,7 +280,11 @@ addr_t vm_map_kernel(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t ma
 	{
 		return -1;
 	}
+	#if defined (MM64)
+	mapsz = (addr_t)incpgnum * PAGING64_PAGESZ;
+	#else
 	mapsz = (addr_t)incpgnum * PAGING_PAGESZ;
+	#endif
 	if (mapstart < astart || (mapstart + mapsz) > aend)
 	{
 		return -1;
@@ -282,7 +299,7 @@ addr_t vm_map_kernel(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t ma
 	user_mm = caller->mm;
 	caller->mm = caller->krnl->mm;
 
-	ret = vmap_page_range(caller, mapstart, incpgnum, frmlst, ret_rg);
+	ret = k_vmap_page_range(caller, mapstart, incpgnum, frmlst, ret_rg);
 	caller->mm = user_mm;
 	if (ret < 0)
 	{
@@ -295,4 +312,50 @@ addr_t vm_map_kernel(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t ma
 
 	return 0;
 }
+
+int get_rgid_by_addr(struct mm_struct *mm, addr_t addr)
+{
+	int i;
+	if (mm == NULL)
+	{
+		return -1;
+	}
+	for (i = 0; i < PAGING_MAX_SYMTBL_SZ; i++)
+	{
+		struct vm_rg_struct *rg = &mm->symrgtbl[i];
+		if (rg->rg_start < rg->rg_end)
+		{
+			if (rg->rg_start <= addr && addr < rg->rg_end) // May be wrong or true (Depend on sample code's true or false)
+			{
+				return i;
+			}
+		}
+	}
+	return -1;
+}
+
+int get_vmaid_by_addr(struct mm_struct *mm, addr_t addr)
+{
+	struct vm_area_struct *vma;
+	if (mm == NULL)
+	{
+		return -1;
+	}
+
+	vma= mm->mmap;
+	while (vma != NULL)
+	{
+		if (vma->vm_start < vma->vm_end)
+		{
+			if (vma->vm_start <= addr && vma->vm_end > addr ) // May be wrong or true (Depend on sample code's true or false)
+			{
+				return vma->vm_id;
+			}
+		}
+		vma = vma->vm_next;
+	}
+	return -1;
+}
+
+
 // #endif
