@@ -576,7 +576,7 @@ addr_t k_vmap_page_range(struct pcb_t *caller, addr_t addr, int pgnum,
 		if (fpit == NULL)
 			break;
 
-		addr_t pgn = PAGING64_PGN(addr + (pgit * PAGING64_PAGESZ));
+		addr_t pgn = PAGING64_PGN((addr + (pgit * PAGING64_PAGESZ)));
 
 		/* Call the Kernel version of the setter */
 		k_pte_set_fpn(caller, pgn, fpit->fpn);
@@ -775,7 +775,7 @@ int vmap_pgd_memset(struct pcb_t *caller, addr_t addr, int pgnum)
 	for (int pgit = 0; pgit < pgnum; pgit++)
 	{
 		addr_t current_vaddr = addr + (pgit * PAGING64_PAGESZ);
-		addr_t pgn = PAGING_PGN(current_vaddr);
+		addr_t pgn = PAGING64_PGN(current_vaddr);
 
 		addr_t *pte = alloc_pte_ptr(caller->mm->pgd, pgn);
 		if (pte)
@@ -815,7 +815,7 @@ addr_t vmap_page_range(struct pcb_t *caller, addr_t addr, int pgnum,
 		addr_t current_vaddr = addr + (pgit * PAGING64_PAGESZ);
 
 		// Convert the virtual address into a Page Number (PGN)
-		addr_t pgn = PAGING_PGN(current_vaddr);
+		addr_t pgn = PAGING64_PGN(current_vaddr);
 
 		// 3. Build the PTE
 		pte_set_fpn(caller, pgn, fpit->fpn);
