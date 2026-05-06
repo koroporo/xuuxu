@@ -57,6 +57,9 @@ int MEMPHY_seq_read(struct memphy_struct *mp, addr_t addr, BYTE *value)
     if (mp->rdmflg)
         return -1; /* Not compatible mode for sequential read */
 
+    if (addr >= mp->maxsz)
+        return -1;
+
     MEMPHY_mv_csr(mp, addr);
     *value = (BYTE)mp->storage[addr];
 
@@ -73,6 +76,10 @@ int MEMPHY_read(struct memphy_struct *mp, addr_t addr, BYTE *value)
 {
     if (mp == NULL)
         return -1;
+
+    if (addr >= mp->maxsz)
+        return -1;
+
     int res = 0;
 
     pthread_mutex_lock(&memphy_lock);
@@ -102,6 +109,9 @@ int MEMPHY_seq_write(struct memphy_struct *mp, addr_t addr, BYTE value)
     if (mp->rdmflg)
         return -1; /* Not compatible mode for sequential read */
 
+    if (addr >= mp->maxsz)
+        return -1;
+
     MEMPHY_mv_csr(mp, addr);
     mp->storage[addr] = value;
 
@@ -118,6 +128,10 @@ int MEMPHY_write(struct memphy_struct *mp, addr_t addr, BYTE data)
 {
     if (mp == NULL)
         return -1;
+
+    if (addr >= mp->maxsz)
+        return -1;
+
     int res = 0;
 
     pthread_mutex_lock(&memphy_lock);

@@ -123,6 +123,8 @@ int __mm_swap_in_page(struct pcb_t *caller, addr_t ramfpn, addr_t swpfpn);
 /* KMEM prototypes */
 addr_t __kmalloc(struct pcb_t *caller, int vmaid, int rgid, addr_t size, addr_t *alloc_addr);
 addr_t __kmem_cache_alloc(struct pcb_t *caller, int vmaid, int rgid, int cache_pool_id, addr_t *alloc_addr);
+int __kfree(struct pcb_t *caller, int rgid);
+int __kmem_cache_free(struct pcb_t *caller, int rgid, int cache_pool_id);
 
 /* VM region prototypes */
 int __read_user_mem(struct pcb_t *caller, int vmaid, int rgid, addr_t offset, BYTE *data);

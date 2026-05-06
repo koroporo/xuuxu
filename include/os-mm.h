@@ -118,6 +118,7 @@ struct kcache_pool_struct {
 #endif
 };
 
+#define KCACHE_MIN_OBJS 8
 
 /* 
  * Memory management struct
