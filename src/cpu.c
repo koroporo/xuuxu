@@ -63,6 +63,7 @@ int run(struct pcb_t *proc)
 	/* Check if Program Counter point to the proper instruction */
 	if (proc->pc >= proc->code->size)
 	{
+		free_pcb_memphy(proc);
 		return 1;
 	}
 

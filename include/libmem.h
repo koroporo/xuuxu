@@ -27,3 +27,4 @@ int libkmem_cache_alloc(struct pcb_t *, uint32_t, uint32_t);
 int libkmem_cache_pool_create(struct pcb_t*, uint32_t, uint32_t, uint32_t);
 int libkmem_copy_from_user(struct pcb_t*, uint32_t, uint32_t, uint32_t, uint32_t);
 int libkmem_copy_to_user(struct pcb_t*, uint32_t, uint32_t, uint32_t, uint32_t);
+int free_pcb_memphy(struct pcb_t *caller);
