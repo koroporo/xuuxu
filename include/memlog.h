@@ -5,6 +5,6 @@
 #include "mm64.h"
 #include "common.h"
 
-void dump_mm_layout(struct pcb_t *caller, const char *name);
+void dump_mm_layout(struct pcb_t *caller, const char *name, int is_kernel);
 
 #endif

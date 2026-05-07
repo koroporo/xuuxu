@@ -19,6 +19,7 @@
 #include "mm64.h"
 #include "syscall.h"
 #include "libmem.h"
+#include "memlog.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -244,7 +245,7 @@ int liballoc(struct pcb_t *proc, addr_t size, uint32_t reg_index)
 #ifdef IODUMP
     printf("\n[LIBALLOC] PID %d: Allocated size %lu at register %u\n", proc->pid, size, reg_index);
     printf("Virtual Address: " FORMATX_ADDR "\n", (void *)addr);
-
+    dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
     print_pgtbl(proc, 0, -1); // print max TBL
 #endif
@@ -735,7 +736,7 @@ int libkmem_malloc(struct pcb_t *caller, uint32_t size, uint32_t reg_index)
     {
         return -1;
     }
-
+    dump_mm_layout(caller, "Kernel", 1);
     return 0;
 }
 
