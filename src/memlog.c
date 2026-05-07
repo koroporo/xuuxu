@@ -1,15 +1,25 @@
 #include "memlog.h"
+#include <string.h>
 
 //Should use this function in _alloc _kmalloc or free()
-void dump_mm_layout(struct pcb_t *caller, const char *name)
+void dump_mm_layout(struct pcb_t *caller, const char *name, int is_kernel)
 {
-    struct mm_struct *mm = caller->mm;
+    struct mm_struct *mm;
+    if (is_kernel == 1)
+    {
+        mm = caller->krnl->mm;
+    }
+    else
+    {
+        mm = caller->mm;
+    }
     if (mm == NULL) {
         printf("%s: mm is NULL\n", name);
         return;
     }
 
     printf("\n===== MEMORY LAYOUT: %s %d=====\n", name, caller->pid);
+    printf("mm=%p\n", mm);
 
     struct vm_area_struct *vma = mm->mmap;
 
@@ -36,7 +46,15 @@ void dump_mm_layout(struct pcb_t *caller, const char *name)
                 printf("\n");
 
                 for (int p = start_pgn; p <= end_pgn; p++) {
-                    uint32_t pte = pte_get_entry(caller, p);
+                    uint32_t pte;
+                    if (is_kernel)
+                    {
+                        pte = k_pte_get_entry(caller, p);
+                    }
+                    else
+                    {
+                        pte = pte_get_entry(caller, p);
+                    }
                     if (PAGING_PAGE_PRESENT(pte)) 
                     {
                         printf("        Page %d -> Frame %d\n", p, PAGING_FPN(pte));

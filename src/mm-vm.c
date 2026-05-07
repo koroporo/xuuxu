@@ -91,6 +91,7 @@ struct vm_rg_struct *get_vm_area_node_at_sbrk_core(struct pcb_t *caller, int vma
 	newrg->rg_start = cur_vma->sbrk;
 	newrg->rg_end = newrg->rg_start + alignedsz;
 	newrg->rg_next = NULL;
+	newrg->mode_bit = isKernel ? 0 : 1;
 	return newrg;
 }
 /*get_vm_area_node - get vm area for a number of pages
@@ -191,15 +192,15 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, addr_t vmastart, a
 
 int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKernel)
 {
-	struct vm_rg_struct *newrg = malloc(sizeof(struct vm_rg_struct));
+	struct vm_rg_struct newrg;
 	struct vm_rg_struct *area;
 	struct vm_area_struct *cur_vma;
 	addr_t inc_amt, old_end, old_sbrk;
 	int incnumpage;
-	if (newrg == NULL)
-	{
-		return -1;
-	}
+	// if (newrg == NULL)
+	// {
+	// 	return -1;
+	// }
 #if defined(MM64)
 	inc_amt = PAGING64_PAGE_ALIGNSZ(inc_sz);
 	incnumpage = inc_amt / PAGING64_PAGESZ;
@@ -220,13 +221,11 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKer
 
 	if (area == NULL)
 	{
-		free(newrg);
 		return -1;
 	}
 	if (cur_vma == NULL)
 	{
 		free(area);
-		free(newrg);
 		return -1;
 	}
 
@@ -244,7 +243,6 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKer
 	if (validate < 0)
 	{
 		free(area);
-		free(newrg);
 		return -1;
 	}
 	cur_vma->vm_end = old_end + inc_amt;
@@ -252,22 +250,20 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKer
 	int vm_map_result;
 	if (isKernel == 1)
 	{
-		vm_map_result = vm_map_kernel(caller, area->rg_start, area->rg_end, old_end, incnumpage, newrg); // May be used old_end or area->rg_start, the old versions of this assig used old_end
+		vm_map_result = vm_map_kernel(caller, area->rg_start, area->rg_end, old_end, incnumpage, &newrg); // May be used old_end or area->rg_start, the old versions of this assig used old_end
 	}
 	else
 	{
-		vm_map_result = vm_map_range(caller, area->rg_start, area->rg_end, old_end, incnumpage, newrg);
+		vm_map_result = vm_map_range(caller, area->rg_start, area->rg_end, old_end, incnumpage, &newrg);
 	}
 	if (vm_map_result != 0)
 	{
 		cur_vma->vm_end = old_end;
 		cur_vma->sbrk = old_sbrk;
 		free(area);
-		free(newrg);
 		return -1;
 	}
 	free(area);
-	free(newrg);
 	return 0;
 }
 
