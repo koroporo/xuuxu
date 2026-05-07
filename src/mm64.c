@@ -673,8 +673,8 @@ addr_t k_vm_map_ram(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t map
  */
 int k_init_mm(struct mm_struct *mm, struct krnl_t *krnl)
 {
-	// Dual-space: Kernel resides at high memory, MSB is 1 (0x8000...)
-	addr_t k_start = (1ULL << 63);
+	// Dual-space: Kernel resides at high memory, bits 63 down to 57 are set to 1
+	addr_t k_start = (0x7FULL << 57);
 
 	__init_mm_common(mm, k_start, krnl->krnl_pgd);
 
