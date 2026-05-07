@@ -124,7 +124,7 @@ struct pcb_t * get_mlq_proc(void) {
 	 * */
 	// attempt = 2 is quite buggy when num CPU >= num processes - 2
 	// consider changing it to 1
-	for (int attempt = 0; attempt < 1; attempt++) {
+	for (int attempt = 0; attempt < 2; attempt++) {
 		int has_process = 0;
 		for (int i = 0; i < MAX_PRIO; i++) {
 			if (!empty(&mlq_ready_queue[i])) {
@@ -136,7 +136,7 @@ struct pcb_t * get_mlq_proc(void) {
 				}
 			}
 		}
-		// no process in the mlq
+		// found a process / no process in the mlq
 		if (proc != NULL || !has_process) {
 			break;
 		}
