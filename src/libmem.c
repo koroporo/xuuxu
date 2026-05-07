@@ -328,22 +328,22 @@ int libfree(struct pcb_t *proc, uint32_t reg_index)
     }
     else
     {
-        struct vm_rg_struct *rgnode;
+        /* A non-kernel address must be a valid user-space address */
+        if (!IS_USER_SPACE(addr))
+            return -1;
+
+        struct vm_rg_struct *rgnode = NULL;
         int rgid = get_symrg_id_by_addr(proc->mm, addr);
         if (rgid >= 0)
         {
             rgnode = get_symrg_byid(proc->mm, rgid);
         }
+
         if (rgnode == NULL || (rgnode->rg_start == 0 && rgnode->rg_end == 0))
         {
             return -1;
         }
         val = __free(proc, rgnode->vmaid, rgid);
-    }
-
-    if (val == -1)
-    {
-        return -1;
     }
 
 #ifdef IODUMP
@@ -353,7 +353,7 @@ int libfree(struct pcb_t *proc, uint32_t reg_index)
     print_pgtbl(proc, 0, -1); // print max TBL
 #endif
 #endif
-    return 0; // val;
+    return val;
 }
 
 /*pg_getpage - get the page in ram
