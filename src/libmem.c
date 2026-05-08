@@ -425,6 +425,18 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
             // The target is back in RAM, so free up its old space in the swap device
             MEMPHY_put_freefp(caller->krnl->active_mswp, target_swpfpn);
         }
+        else
+        {
+            /* Zero-fill-on-demand */
+            #ifdef MM64
+            int pagesz = PAGING64_PAGESZ;
+            #else
+            int pagesz = PAGING_PAGESZ;
+            #endif
+            for (int i = 0; i < pagesz; i++) {
+                MEMPHY_write(caller->krnl->mram, vicfpn * pagesz + i, 0);
+            }
+        }
 
         /* Update target's page table to point to the new RAM frame */
         pte_set_fpn(caller, pgn, vicfpn);
@@ -448,7 +460,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     else
     {
 #ifdef PAGEFAULT_PRINT
-            printf("[PAGE HIT] PID %d: Virtual Page %d is present in RAM.\n", caller->pid, pgn);
+        printf("[PAGE HIT] PID %d: Virtual Page %d is present in RAM.\n", caller->pid, pgn);
 #endif
     }
 
