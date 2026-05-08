@@ -370,46 +370,45 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     uint32_t pte = pte_get_entry(caller, pgn);
 
     if (!PAGING_PAGE_PRESENT(pte))
-    { /* Page is not online, make it actively living */
+    {   
+        #ifdef PAGEFAULT_PRINT
+        printf("[PAGE FAULT] PID %d: Virtual Page %d is missing from RAM.\n", caller->pid, pgn);
+        #endif
+        /* Page is not online, make it actively living */
         addr_t vicfpn, swpfpn;
         // addr_t tgtfpn; TODO: check this
 
         addr_t vicpgn;
-        /* Find victim page */
-        if (find_victim_page(mm, &vicpgn) == -1)
+        /* Check if we have a free frame in RAM first */
+        if (MEMPHY_get_freefp(caller->krnl->mram, &vicfpn) != 0)
         {
-            return -1;
+            /* RAM is full! Find victim page to swap out */
+            if (find_victim_page(mm, &vicpgn) == -1)
+            {
+                return -1;
+            }
+            uint32_t vicpte = pte_get_entry(caller, vicpgn);
+            vicfpn = PAGING_FPN(vicpte);
+
+            /* Get free frame in MEMSWP */
+            if (MEMPHY_get_freefp(caller->krnl->active_mswp, &swpfpn) == -1)
+            {
+                return -1;
+            }
+
+            /* Optimize: Swap out ONLY if the victim page is dirty */
+            if (vicpte & PAGING_PTE_DIRTY_MASK)
+            {
+                arg_t a1 = SYSMEM_SWP_OP;
+                arg_t a2 = vicfpn;
+                arg_t a3 = swpfpn;
+                libsyscall(caller, 17, a1, a2, a3);
+            }
+            // _syscall(caller->krnl, caller->pid, 17, &regs);
+
+            /* Update page table */
+            pte_set_swap(caller, vicpgn, caller->krnl->active_mswp_id, swpfpn);
         }
-        uint32_t vicpte = pte_get_entry(caller, vicpgn);
-        vicfpn = PAGING_FPN(vicpte);
-
-        /* Get free frame in MEMSWP */
-        if (MEMPHY_get_freefp(caller->krnl->active_mswp, &swpfpn) == -1)
-        {
-            return -1;
-        }
-
-        /* TODO: Implement swap frame from MEMRAM to MEMSWP and vice versa*/
-        // vm: now we have victim frame, free frame, and tgt frame
-
-        /* TODO copy victim frame to swap
-
-         * SWP(vicfpn <--> swpfpn)
-         * SYSCALL 1 sys_memmap
-         */
-
-        /* Optimize: Swap out ONLY if the victim page is dirty */
-        if (vicpte & PAGING_PTE_DIRTY_MASK)
-        {
-            arg_t a1 = SYSMEM_SWP_OP;
-            arg_t a2 = vicfpn;
-            arg_t a3 = swpfpn;
-            libsyscall(caller, 17, a1, a2, a3);
-        }
-        // _syscall(caller->krnl, caller->pid, 17, &regs);
-
-        /* Update page table */
-        pte_set_swap(caller, vicpgn, caller->krnl->active_mswp_id, swpfpn);
 
         // Needs swapping ing
         if (pte & PAGING_PTE_SWAPPED_MASK)
@@ -445,6 +444,12 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
         /* Enlist the new page in the USER's FIFO tracking list */
         enlist_pgn_node(&mm->fifo_pgn, pgn);
+    }
+    else
+    {
+#ifdef PAGEFAULT_PRINT
+            printf("[PAGE HIT] PID %d: Virtual Page %d is present in RAM.\n", caller->pid, pgn);
+#endif
     }
 
     *fpn = PAGING_FPN(pte_get_entry(caller, pgn));
@@ -634,6 +639,7 @@ int libread(
 #ifdef IODUMP
     /* TODO dump IO content (if needed) */
     printf("[LIBREAD] PID %d: read %c from reg[%d]+offset[%ld] ", proc->pid, data, source, offset);
+    dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
     print_pgtbl(proc, 0, -1); // print max TBL
 #endif
@@ -705,6 +711,7 @@ int libwrite(
 #ifdef IODUMP
     /* TODO dump IO content (if needed) */
     printf("\n[LIBWRITE] PID %d: data %c written to Reg[%u]+offset[%lu] - " FORMATX_ADDR "\n", proc->pid, data, destination, offset, (void *)address);
+    dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
     print_pgtbl(proc, 0, -1); // print max TBL
 #endif

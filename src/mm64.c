@@ -844,30 +844,19 @@ addr_t vmap_page_range(struct pcb_t *caller, addr_t addr, int pgnum,
 addr_t vm_map_ram(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t mapstart, int incpgnum, struct vm_rg_struct *ret_rg)
 {
 	/*@bksysnet: author provides a feasible solution of getting frames
-	 *FATAL logic in here, wrong behaviour if we have not enough page
-	 *i.e. we request 1000 frames meanwhile our RAM has size of 3 frames
-	 *Don't try to perform that case in this simple work, it will result
-	 *in endless procedure of swap-off to get frame and we have not provide
-	 *duplicate control mechanism, keep it simple
+	 * CHANGED: True Demand Paging implementation.
+	 * We only map the virtual memory region. Physical frames are allocated
+	 * dynamically during page faults in pg_getpage().
 	 */
-	struct framephy_struct *frm_lst = NULL;
-	addr_t ret_alloc = 0;
-	int pgnum = incpgnum;
+	ret_rg->rg_start = mapstart;
+	ret_rg->rg_end = mapstart + (incpgnum * PAGING64_PAGESZ);
 
-	ret_alloc = alloc_pages_range(caller, pgnum, &frm_lst);
-
-	if (ret_alloc < 0 && ret_alloc != -3000)
-		return -1;
-
-	/* Out of memory */
-	if (ret_alloc == -3000)
-	{
-		return -1;
+	for (int pgit = 0; pgit < incpgnum; pgit++) {
+		addr_t current_vaddr = mapstart + (pgit * PAGING64_PAGESZ);
+		addr_t pgn = PAGING64_PGN(current_vaddr);
+		addr_t *pte = alloc_pte_ptr(caller->mm->pgd, pgn);
+		if (pte) *pte = 0; // Initialize as Not Present
 	}
-
-	/* it leaves the case of memory is enough but half in ram, half in swap
-	 * do the swaping all to swapper to get the all in ram */
-	vmap_page_range(caller, mapstart, incpgnum, frm_lst, ret_rg);
 	return 0;
 }
 
