@@ -298,7 +298,7 @@ int libfree(struct pcb_t *proc, uint32_t reg_index)
             if (pool->size == 0)
                 continue;
 
-            addr_t required_size = pool->size * 8 + pool->align;
+            addr_t required_size = pool->size * KCACHE_MIN_OBJS + pool->align;
 #ifdef MM64
             addr_t slab_size = PAGING64_PAGE_ALIGNSZ(required_size);
 #else
@@ -854,6 +854,7 @@ int __slab_alloc(struct pcb_t *caller, struct kcache_pool_struct *pool)
 {
     /* Dynamically determine slab size */
     int min_objs = KCACHE_MIN_OBJS;
+    /* Add align to compensate for starting address alignment later*/
     addr_t required_size = pool->size * min_objs + pool->align;
     addr_t slab_size = PAGING64_PAGE_ALIGNSZ(required_size);
 
