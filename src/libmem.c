@@ -427,7 +427,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
         }
         else
         {
-            /* ZERO-FILL ON DEMAND: Clean the frame for the new page */
+            /* Zero-fill-on-demand */
             #ifdef MM64
             int pagesz = PAGING64_PAGESZ;
             #else
@@ -502,7 +502,7 @@ int pg_getval(struct mm_struct *mm, int addr, BYTE *data, struct pcb_t *caller)
 
     int phyaddr = (fpn << PAGING64_ADDR_FPN_LOBIT) + off;
 
-    struct sc_regs regs = {0};
+    struct sc_regs regs;
     regs.a1 = SYSMEM_IO_READ;
     regs.a2 = phyaddr;
     _syscall(caller->krnl, caller->pid, 17, &regs);
