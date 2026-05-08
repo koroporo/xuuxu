@@ -20,7 +20,7 @@
 //#define MMDBG 1
 #define IODUMP 1
 #define PAGETBL_DUMP 1
-
+#define PAGEFAULT_PRINT 67
 /* 
  * @bksysnet:
  *    The address mode must be explicitly define in MM64 or no-MM64
