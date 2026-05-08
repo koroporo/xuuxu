@@ -174,7 +174,7 @@ static void *ld_routine(void *args)
 	while (i < num_processes)
 	{
 		struct pcb_t *proc = load(ld_processes.path[i]);
-		struct krnl_t *krnl = proc->krnl = &os;
+		proc->krnl = &os;
 		proc->mm = malloc(sizeof(struct mm_struct));
 		init_mm(proc->mm, proc);
 

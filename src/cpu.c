@@ -127,5 +127,13 @@ int run(struct pcb_t *proc)
 	default:
 		stat = 1;
 	}
+
+	/* If the instruction failed, terminate the program */
+	if (stat != 0) {
+#ifdef DEBUG
+		printf("\n[KERNEL] Process %d killed (Segmentation Fault / Execution Error)\n", proc->pid);
+#endif
+		proc->pc = proc->code->size; /* Fast-forward PC to force termination in the next OS cycle */
+	}
 	return stat;
 }

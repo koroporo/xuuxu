@@ -260,7 +260,11 @@ int init_memphy(struct memphy_struct *mp, addr_t max_size, int randomflg)
     mp->maxsz = max_size;
     memset(mp->storage, 0, max_size * sizeof(BYTE));
 
+#ifdef MM64
     int ret = MEMPHY_format(mp, PAGING64_PAGESZ);
+#else
+    int ret = MEMPHY_format(mp, PAGING_PAGESZ);
+#endif
 
     mp->rdmflg = (randomflg != 0) ? 1 : 0;
 
@@ -283,7 +287,11 @@ int MEMPHY_get_contiguous_freefp(struct memphy_struct *mp, int req_pgnum, struct
 
     pthread_mutex_lock(&memphy_lock);
 
+#ifdef MM64
     int fpnum = mp->maxsz / PAGING64_PAGESZ;
+#else
+    int fpnum = mp->maxsz / PAGING_PAGESZ;
+#endif
 
     if (fpnum <= 0) {
         pthread_mutex_unlock(&memphy_lock);

@@ -1,0 +1,7 @@
+1 6
+alloc 16384 0
+write 65 0 0 
+write 66 0 4096
+write 67 0 8192
+write 68 0 12288
+read 0 0 1

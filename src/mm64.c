@@ -331,10 +331,14 @@ int __swap_cp_page(struct memphy_struct *mpsrc, addr_t srcfpn,
 {
 	int cellidx;
 	addr_t addrsrc, addrdst;
-	for (cellidx = 0; cellidx < PAGING_PAGESZ; cellidx++)
+	
+	int pagesz = PAGING64_PAGESZ;
+
+
+	for (cellidx = 0; cellidx < pagesz; cellidx++)
 	{
-		addrsrc = srcfpn * PAGING_PAGESZ + cellidx;
-		addrdst = dstfpn * PAGING_PAGESZ + cellidx;
+		addrsrc = srcfpn * pagesz + cellidx;
+		addrdst = dstfpn * pagesz + cellidx;
 
 		BYTE data;
 		MEMPHY_read(mpsrc, addrsrc, &data);

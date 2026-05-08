@@ -371,7 +371,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     if (!PAGING_PAGE_PRESENT(pte))
     {   
-        #ifdef PAGEFAULT_PRINT
+        #ifdef DEBUG
         printf("[PAGE FAULT] PID %d: Virtual Page %d is missing from RAM.\n", caller->pid, pgn);
         #endif
         /* Page is not online, make it actively living */
@@ -399,10 +399,19 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
             /* Optimize: Swap out ONLY if the victim page is dirty */
             if (vicpte & PAGING_PTE_DIRTY_MASK)
             {
+#ifdef DEBUG
+                printf("\n[DIRTY BIT] Victim Page %ld is DIRTY! Writing to disk...\n", vicpgn);
+#endif
                 arg_t a1 = SYSMEM_SWP_OP;
                 arg_t a2 = vicfpn;
                 arg_t a3 = swpfpn;
                 libsyscall(caller, 17, a1, a2, a3);
+            }
+            else 
+            {
+#ifdef DEBUG
+                printf("\n[DIRTY BIT] Victim Page %ld is CLEAN! Bypassing disk write.\n", vicpgn);
+#endif
             }
             // _syscall(caller->krnl, caller->pid, 17, &regs);
 
@@ -459,7 +468,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     }
     else
     {
-#ifdef PAGEFAULT_PRINT
+#ifdef DEBUG
         printf("[PAGE HIT] PID %d: Virtual Page %d is present in RAM.\n", caller->pid, pgn);
 #endif
     }

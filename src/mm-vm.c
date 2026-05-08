@@ -42,8 +42,6 @@ struct vm_area_struct *get_vma_by_num(struct mm_struct *mm, int vmaid)
 	if (mm->mmap == NULL)
 		return NULL;
 
-	int vmait = pvma->vm_id;
-
 	while (pvma != NULL)
 	{
 		if ((int)pvma->vm_id == vmaid)
@@ -67,11 +65,11 @@ int __mm_swap_in_page(struct pcb_t *caller, addr_t ramfpn, addr_t swpfpn)
 	__swap_cp_page(caller->krnl->active_mswp, swpfpn, caller->krnl->mram, ramfpn);
 	return 0;
 }
-struct vm_rg_struct *get_vm_area_node_at_sbrk_core(struct pcb_t *caller, int vmaid, addr_t size, addr_t alignedsz, int isKernel)
+struct vm_rg_struct *get_vm_area_node_at_sbrk_core(struct pcb_t *caller, int vmaid, addr_t size, addr_t alignedsz, int is_kernel)
 {
 	struct vm_rg_struct *newrg;
 	struct vm_area_struct *cur_vma;
-	if (isKernel)
+	if (is_kernel)
 	{
 		cur_vma = get_vma_by_num(caller->krnl->mm, vmaid);
 	}
@@ -91,7 +89,7 @@ struct vm_rg_struct *get_vm_area_node_at_sbrk_core(struct pcb_t *caller, int vma
 	newrg->rg_start = cur_vma->sbrk;
 	newrg->rg_end = newrg->rg_start + alignedsz;
 	newrg->rg_next = NULL;
-	newrg->mode_bit = isKernel ? 0 : 1;
+	newrg->mode_bit = is_kernel ? 0 : 1;
 	return newrg;
 }
 /*get_vm_area_node - get vm area for a number of pages
@@ -122,7 +120,7 @@ struct vm_rg_struct *get_vm_area_node_at_sbrk(struct pcb_t *caller, int vmaid, a
 
 	return get_vm_area_node_at_sbrk_core(caller, vmaid, size, alignedsz, 0);
 }
-int validate_overlap_vma_area_core(struct pcb_t *caller, int vmaid, addr_t vmastart, addr_t vmaend, int isKernel)
+int validate_overlap_vma_area_core(struct pcb_t *caller, int vmaid, addr_t vmastart, addr_t vmaend, int is_kernel)
 {
 	if (vmastart >= vmaend || caller == NULL)
 	{
@@ -130,7 +128,7 @@ int validate_overlap_vma_area_core(struct pcb_t *caller, int vmaid, addr_t vmast
 	}
 
 	struct vm_area_struct *vma;
-	if (isKernel)
+	if (is_kernel)
 	{
 		vma = caller->krnl->mm->mmap;
 	}
@@ -146,7 +144,7 @@ int validate_overlap_vma_area_core(struct pcb_t *caller, int vmaid, addr_t vmast
 	/* TODO validate the planned memory area is not overlapped */
 
 	struct vm_area_struct *cur_area;
-	if (isKernel)
+	if (is_kernel)
 	{
 		cur_area = get_vma_by_num(caller->krnl->mm, vmaid);
 	}
@@ -190,7 +188,7 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, addr_t vmastart, a
 	return validate_overlap_vma_area_core(caller, vmaid, vmastart, vmaend, 0);
 }
 
-int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKernel)
+int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int is_kernel)
 {
 	struct vm_rg_struct newrg;
 	struct vm_rg_struct *area;
@@ -208,7 +206,7 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKer
 	inc_amt = PAGING_PAGE_ALIGNSZ(inc_sz);
 	incnumpage = inc_amt / PAGING_PAGESZ;
 #endif
-	if (isKernel == 1)
+	if (is_kernel == 1)
 	{
 		area = k_get_vm_area_node_at_sbrk(caller, vmaid, inc_sz, inc_amt);
 		cur_vma = get_vma_by_num(caller->krnl->mm, vmaid);
@@ -232,7 +230,7 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKer
 	old_end = cur_vma->vm_end;
 	old_sbrk = cur_vma->sbrk;
 	int validate;
-	if (isKernel == 1)
+	if (is_kernel == 1)
 	{
 		validate = k_validate_overlap_vm_area(caller, vmaid, area->rg_start, area->rg_end);
 	}
@@ -248,7 +246,7 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int isKer
 	cur_vma->vm_end = old_end + inc_amt;
 	cur_vma->sbrk = area->rg_end;
 	int vm_map_result;
-	if (isKernel == 1)
+	if (is_kernel == 1)
 	{
 		vm_map_result = vm_map_kernel(caller, area->rg_start, area->rg_end, old_end, incnumpage, &newrg); // May be used old_end or area->rg_start, the old versions of this assig used old_end
 	}
@@ -432,16 +430,6 @@ int k_validate_overlap_vm_area(struct pcb_t *caller, int vmaid, addr_t vmastart,
 
 struct vm_rg_struct *k_get_vm_area_node_at_sbrk(struct pcb_t *caller, int vmaid, addr_t size, addr_t alignedsz)
 {
-	struct vm_rg_struct *newrg;
-	/* TODO retrive current vma to obtain newrg, current comment out due to compiler redundant warning*/
-	// struct vm_area_struct *cur_vma = get_vma_by_num(caller->kernl->mm, vmaid);
-
-	// newrg = malloc(sizeof(struct vm_rg_struct));
-
-	/* TODO: update the newrg boundary
-	// newrg->rg_start = ...
-	// newrg->rg_end = ...
-	*/
 	if (caller == NULL || caller->krnl == NULL || caller->krnl->mm == NULL)
 	{
 		return NULL;

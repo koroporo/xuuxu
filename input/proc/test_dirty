@@ -1,0 +1,9 @@
+1 8
+alloc 12288 0
+read 0 0 1
+read 0 4096 2
+read 0 8192 3
+write 65 0 0 
+read 0 4096 2
+read 0 8192 3
+read 0 0 1
