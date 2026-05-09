@@ -243,8 +243,8 @@ int liballoc(struct pcb_t *proc, addr_t size, uint32_t reg_index)
     proc->regs[reg_index] = addr;
     printf("%s:%d\n", __func__, __LINE__);
 #ifdef IODUMP
-    printf("\n[LIBALLOC] PID %d: Allocated size %lu at register %u\n", proc->pid, size, reg_index);
-    printf("Virtual Address: " FORMATX_ADDR "\n", (void *)addr);
+    printf("\t[LIBALLOC] PID %d: Allocated size %lu at register %u\n", proc->pid, size, reg_index);
+    printf("\tVirtual Address: " FORMATX_ADDR "\n", (void *)addr);
     dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
     print_pgtbl(proc, 0, -1); // print max TBL
@@ -264,10 +264,6 @@ int liballoc(struct pcb_t *proc, addr_t size, uint32_t reg_index)
 int libfree(struct pcb_t *proc, uint32_t reg_index)
 {
     addr_t addr = proc->regs[reg_index];
-    if (addr == 0)
-    {
-        return -1;
-    }
     printf("%s:%d\n", __func__, __LINE__);
 
     int is_kmem = 0;
@@ -349,7 +345,7 @@ int libfree(struct pcb_t *proc, uint32_t reg_index)
 
 #ifdef IODUMP
     /* TODO dump IO content (if needed) */
-    printf("\n[LIBFREE] PID %d at register %u\n", proc->pid, reg_index);
+    printf("\t[LIBFREE] PID %d at register %u\n", proc->pid, reg_index);
 #ifdef PAGETBL_DUMP
     print_pgtbl(proc, 0, -1); // print max TBL
 #endif
@@ -372,7 +368,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     if (!PAGING_PAGE_PRESENT(pte))
     {   
         #ifdef DEBUG
-        printf("[PAGE FAULT] PID %d: Virtual Page %d is missing from RAM.\n", caller->pid, pgn);
+        printf("\t[PAGE FAULT] PID %d: Virtual Page %d is missing from RAM.\n", caller->pid, pgn);
         #endif
         /* Page is not online, make it actively living */
         addr_t vicfpn, swpfpn;
@@ -398,9 +394,9 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
             /* Optimize: Swap out ONLY if the victim page is dirty */
             if (vicpte & PAGING_PTE_DIRTY_MASK)
             {
-#ifdef DEBUG
-                printf("\n[DIRTY BIT] Victim Page %ld is DIRTY! Writing to disk...\n", vicpgn);
-#endif
+                #ifdef DEBUG
+                printf("\t[DIRTY BIT] Victim Page %ld is DIRTY! Writing to disk...\n", vicpgn);
+                #endif
                 arg_t a1 = SYSMEM_SWP_OP;
                 arg_t a2 = vicfpn;
                 arg_t a3 = swpfpn;
@@ -408,9 +404,9 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
             }
             else 
             {
-#ifdef DEBUG
-                printf("\n[DIRTY BIT] Victim Page %ld is CLEAN! Bypassing disk write.\n", vicpgn);
-#endif
+                #ifdef DEBUG
+                printf("\t[DIRTY BIT] Victim Page %ld is CLEAN! Bypassing disk write.\n", vicpgn);
+                #endif
             }
             // _syscall(caller->krnl, caller->pid, 17, &regs);
 
@@ -468,7 +464,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     else
     {
 #ifdef DEBUG
-        printf("[PAGE HIT] PID %d: Virtual Page %d is present in RAM.\n", caller->pid, pgn);
+        printf("\t[PAGE HIT] PID %d: Virtual Page %d is present in RAM.\n", caller->pid, pgn);
 #endif
     }
 
@@ -658,7 +654,7 @@ int libread(
 
 #ifdef IODUMP
     /* TODO dump IO content (if needed) */
-    printf("[LIBREAD] PID %d: read %c from reg[%d]+offset[%ld] ", proc->pid, data, source, offset);
+    printf("\t[LIBREAD] PID %d: read %c from reg[%d]+offset[%ld] ", proc->pid, data, source, offset);
     dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
     print_pgtbl(proc, 0, -1); // print max TBL
@@ -730,7 +726,7 @@ int libwrite(
 
 #ifdef IODUMP
     /* TODO dump IO content (if needed) */
-    printf("\n[LIBWRITE] PID %d: data %c written to Reg[%u]+offset[%lu] - " FORMATX_ADDR "\n", proc->pid, data, destination, offset, (void *)address);
+    printf("\t[LIBWRITE] PID %d: data %c written to Reg[%u]+offset[%lu] - " FORMATX_ADDR "\n", proc->pid, data, destination, offset, (void *)address);
     dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
     print_pgtbl(proc, 0, -1); // print max TBL
