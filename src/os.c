@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 static int time_slot;
 static int num_cpus;
@@ -282,10 +284,23 @@ int main(int argc, char *argv[])
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
 	/* Read config */
-	if (argc != 2)
+	if (argc != 2 && argc != 3)
 	{
-		printf("Usage: os [path to configure file]\n");
+		printf("Usage: os [path to configure file] [output_dir (optional)]\n");
 		return 1;
+	}
+
+	/* Redirect stdout to file if output directory is provided */
+	if (argc == 3)
+	{
+		mkdir(argv[2], 0777);
+		char out_path[256];
+		snprintf(out_path, sizeof(out_path), "%s/%s.txt", argv[2], argv[1]);
+		if (freopen(out_path, "w", stdout) == NULL)
+		{
+			fprintf(stderr, "Cannot open output file %s\n", out_path);
+			return 1;
+		}
 	}
 	char path[100];
 	path[0] = '\0';
