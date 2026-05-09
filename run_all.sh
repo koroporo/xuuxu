@@ -6,7 +6,7 @@ mkdir -p "$OUTPUT_DIR"
 echo "Run all in input/ ..."
 echo "--------------------------------------------------------"
 
-for config_path in input/os_*; do
+for config_path in input/*; do
     if [ -f "$config_path" ]; then
         config_name=$(basename "$config_path")
         echo "-> Running: $config_name"
