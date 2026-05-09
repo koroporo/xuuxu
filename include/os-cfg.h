@@ -21,6 +21,7 @@
 #define IODUMP 1
 #define PAGETBL_DUMP 1
 #define DEBUG 67
+// #define TIME_DEBUG
 /* 
  * @bksysnet:
  *    The address mode must be explicitly define in MM64 or no-MM64

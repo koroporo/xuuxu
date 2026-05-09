@@ -376,7 +376,6 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
         #endif
         /* Page is not online, make it actively living */
         addr_t vicfpn, swpfpn;
-        // addr_t tgtfpn; TODO: check this
 
         addr_t vicpgn;
         /* Check if we have a free frame in RAM first */

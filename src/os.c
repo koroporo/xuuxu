@@ -69,6 +69,13 @@ static void set_is_done(int value)
 	pthread_mutex_unlock(&done_lock);
 }
 
+#ifdef TIME_DEBUG
+static void display_time()
+{
+	printf("\t[TIME: %ld]", current_time());
+}
+#endif
+
 static void *cpu_routine(void *args)
 {
 	struct timer_id_t *timer_id = ((struct cpu_args *)args)->timer_id;
@@ -92,6 +99,9 @@ static void *cpu_routine(void *args)
 		}
 		else if (proc->pc == proc->code->size)
 		{
+			#ifdef TIME_DEBUG
+			display_time();
+			#endif
 			/* The porcess has finish it job */
 			printf("\tCPU %d: Processed %2d has finished\n",
 				   id, proc->pid);
@@ -101,6 +111,9 @@ static void *cpu_routine(void *args)
 		}
 		else if (time_left == 0)
 		{
+			#ifdef TIME_DEBUG
+			display_time();
+			#endif
 			/* The process has done its job in current time slot */
 			printf("\tCPU %d: Put process %2d to run queue\n",
 				   id, proc->pid);
@@ -111,6 +124,9 @@ static void *cpu_routine(void *args)
 		/* Recheck process status after loading new process */
 		if (proc == NULL && is_done())
 		{
+			#ifdef TIME_DEBUG
+			display_time();
+			#endif
 			/* No process to run, exit */
 			printf("\tCPU %d stopped\n", id);
 			break;
@@ -124,6 +140,9 @@ static void *cpu_routine(void *args)
 		}
 		else if (time_left == 0)
 		{
+			#ifdef TIME_DEBUG
+			display_time();
+			#endif
 			printf("\tCPU %d: Dispatched process %2d\n",
 				   id, proc->pid);
 			time_left = time_slot;
@@ -185,6 +204,9 @@ static void *ld_routine(void *args)
 		{
 			next_slot(timer_id);
 		}
+		#ifdef TIME_DEBUG
+		display_time();
+		#endif
 		printf("\tLoaded a process at %s, PID: %d PRIO: %ld\n",
 			   ld_processes.path[i], proc->pid, ld_processes.prio[i]);
 		add_proc(proc);
@@ -258,6 +280,7 @@ static void read_config(const char *path)
 
 int main(int argc, char *argv[])
 {
+	setvbuf(stdout, NULL, _IONBF, 0);
 	/* Read config */
 	if (argc != 2)
 	{
