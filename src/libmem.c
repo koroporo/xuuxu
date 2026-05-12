@@ -76,19 +76,22 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, addr_t size, addr_t *allo
     /*Allocate at the toproof */
     pthread_mutex_lock(&mmvm_lock);
 
-    /* Use the provided rgid parameter directly */
-    if (rgid < 0 || rgid >= PAGING_MAX_SYMTBL_SZ)
+    /* Find an empty symbol region in the table instead of using the passed rgid */
+    rgid = -1;
+    for (int i = 0; i < PAGING_MAX_SYMTBL_SZ; i++)
+    {
+        if (caller->mm->symrgtbl[i].rg_start == 0 && caller->mm->symrgtbl[i].rg_end == 0)
+        {
+            rgid = i;
+            break;
+        }
+    }
+    if (rgid == -1)
     {
         pthread_mutex_unlock(&mmvm_lock);
         return -1;
     }
 
-    /* Check if the slot is already in use */
-    if (caller->mm->symrgtbl[rgid].rg_start != 0 || caller->mm->symrgtbl[rgid].rg_end != 0)
-    {
-        pthread_mutex_unlock(&mmvm_lock);
-        return -1;
-    }
 
     struct vm_rg_struct rgnode;
     rgnode.mode_bit = 1;
