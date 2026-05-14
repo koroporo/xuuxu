@@ -297,12 +297,7 @@ int libfree(struct pcb_t *proc, uint32_t reg_index)
             if (pool->size == 0)
                 continue;
 
-            addr_t required_size = pool->size * KCACHE_MIN_OBJS + pool->align;
-#ifdef MM64
-            addr_t slab_size = PAGING64_PAGE_ALIGNSZ(required_size);
-#else
-            addr_t slab_size = PAGING_PAGE_ALIGNSZ(required_size);
-#endif
+            addr_t slab_size = pool->size;
             struct slab_struct *slab = pool->slabs;
             while (slab != NULL)
             {
@@ -766,6 +761,49 @@ int libkmem_malloc(struct pcb_t *caller, uint32_t size, uint32_t reg_index)
     return 0;
 }
 
+int __kalloc_vma_region(struct pcb_t *caller, int vmaid, addr_t size, struct vm_rg_struct *ret_rg, int enlist_leftover)
+{
+    struct vm_area_struct *cur_vma = get_vma_by_num(caller->krnl->mm, vmaid);
+
+    if (cur_vma == NULL)
+    {
+        return -1;
+    }
+
+    ret_rg->mode_bit = 0;
+    if (get_free_vmrg_area(caller, vmaid, size, ret_rg) != 0)
+    {
+        addr_t old_sbrk = cur_vma->sbrk;
+        if (k_inc_vma_limit(caller, vmaid, size) == -1)
+        {
+            return -1;
+        }
+        else
+        {
+            ret_rg->rg_start = old_sbrk;
+            ret_rg->rg_end = old_sbrk + size;
+            ret_rg->vmaid = vmaid;
+
+            
+            // Enlist the free space between region end and sbrk if requested
+            if (enlist_leftover && (old_sbrk + size < cur_vma->sbrk))
+            {
+                struct vm_rg_struct *leftover_rg = malloc(sizeof(struct vm_rg_struct));
+                if (leftover_rg != NULL)
+                {
+                    leftover_rg->rg_start = old_sbrk + size;
+                    leftover_rg->rg_end = cur_vma->sbrk;
+                    leftover_rg->vmaid = cur_vma->vm_id;
+                    leftover_rg->mode_bit = 0; /* Kernel mode */
+                    leftover_rg->rg_next = NULL;
+                    enlist_vm_freerg_list(caller->krnl->mm, leftover_rg);
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 /*
 
  *kmalloc - alloc region memory in kmem
@@ -797,45 +835,12 @@ addr_t __kmalloc(struct pcb_t *caller, int vmaid, int rgid, addr_t size, addr_t 
         return 0x0;
     }
 
-    struct vm_area_struct *cur_vma = get_vma_by_num(krnl_mm, vmaid);
     struct vm_rg_struct ret_rg;
 
-    if (cur_vma == NULL)
+    if (__kalloc_vma_region(caller, vmaid, size, &ret_rg, 1) == -1)
     {
         pthread_mutex_unlock(&mmvm_lock);
         return 0x0;
-    }
-
-    ret_rg.mode_bit = 0;
-    if (get_free_vmrg_area(caller, vmaid, size, &ret_rg) != 0)
-    {
-        addr_t old_sbrk = cur_vma->sbrk;
-        if (k_inc_vma_limit(caller, vmaid, size) == -1)
-        {
-            pthread_mutex_unlock(&mmvm_lock);
-            return 0x0;
-        }
-        else
-        {
-            ret_rg.rg_start = old_sbrk;
-            ret_rg.rg_end = old_sbrk + size;
-            ret_rg.vmaid = vmaid;
-
-            // Elist the free space between region end and sbrk
-            if (old_sbrk + size < cur_vma->sbrk)
-            {
-                struct vm_rg_struct *leftover_rg = malloc(sizeof(struct vm_rg_struct));
-                if (leftover_rg != NULL)
-                {
-                    leftover_rg->rg_start = old_sbrk + size;
-                    leftover_rg->rg_end = cur_vma->sbrk;
-                    leftover_rg->vmaid = cur_vma->vm_id;
-                    leftover_rg->mode_bit = 0; /* Kernel mode */
-                    leftover_rg->rg_next = NULL;
-                    enlist_vm_freerg_list(caller->krnl->mm, leftover_rg);
-                }
-            }
-        }
     }
 
     krnl_mm->symrgtbl[rgid].rg_start = ret_rg.rg_start;
@@ -850,25 +855,21 @@ addr_t __kmalloc(struct pcb_t *caller, int vmaid, int rgid, addr_t size, addr_t 
 
 int __slab_alloc(struct pcb_t *caller, struct kcache_pool_struct *pool)
 {
-    /* Dynamically determine slab size */
-    int min_objs = KCACHE_MIN_OBJS;
-    /* Add align to compensate for starting address alignment later*/
-    addr_t required_size = pool->size * min_objs + pool->align;
-    addr_t slab_size = PAGING64_PAGE_ALIGNSZ(required_size);
+    addr_t slab_size = pool->size;
 
     addr_t new_slab_addr;
-    if (__kmalloc(caller, 0, -1, slab_size, &new_slab_addr) == 0)
+    struct vm_rg_struct ret_rg;
+
+    pthread_mutex_lock(&mmvm_lock);
+    if (__kalloc_vma_region(caller, 0, slab_size, &ret_rg, 0) == -1)
     {
+        pthread_mutex_unlock(&mmvm_lock);
         return -1;
     }
-    addr_t aligned_start = new_slab_addr;
-    if (pool->align > 0 && (aligned_start % pool->align) != 0)
-    {
-        aligned_start += (pool->align - (aligned_start % pool->align));
-    }
+    pthread_mutex_unlock(&mmvm_lock);
+    new_slab_addr = ret_rg.rg_start;
 
-    int usable_space = slab_size - (aligned_start - new_slab_addr);
-    int num_objs = usable_space / pool->size;
+    int num_objs = slab_size / pool->align;
 
     if (num_objs <= 0)
     {
@@ -876,13 +877,13 @@ int __slab_alloc(struct pcb_t *caller, struct kcache_pool_struct *pool)
     }
 
     struct slab_struct *new_slab = malloc(sizeof(struct slab_struct));
-    new_slab->addr = aligned_start;
+    new_slab->addr = new_slab_addr;
     new_slab->free_list = malloc(num_objs * sizeof(struct free_obj));
     new_slab->storage = 0;
 
     for (int i = 0; i < num_objs; i++)
     {
-        new_slab->free_list[i].addr = aligned_start + i * pool->size;
+        new_slab->free_list[i].addr = new_slab_addr + i * pool->align;
         new_slab->free_list[i].next = (i < num_objs - 1) ? i + 1 : -1;
     }
 
@@ -943,8 +944,10 @@ int libkmem_cache_alloc(struct pcb_t *proc, uint32_t cache_pool_id, uint32_t reg
     if (__kmem_cache_alloc(proc, 0, reg_index, cache_pool_id, &addr) == 0)
     {
         proc->regs[reg_index] = addr;
+        dump_mm_layout(proc, "Kernel", 1);
         return 0;
     }
+    
     return -1;
 }
 
@@ -1011,7 +1014,7 @@ addr_t __kmem_cache_alloc(struct pcb_t *caller, int vmaid, int rgid, int cache_p
 
     /* Add to symbol table */
     mm->symrgtbl[rgid].rg_start = *alloc_addr;
-    mm->symrgtbl[rgid].rg_end = *alloc_addr + pool->size;
+    mm->symrgtbl[rgid].rg_end = *alloc_addr + pool->align;
     mm->symrgtbl[rgid].vmaid = vmaid;
     mm->symrgtbl[rgid].mode_bit = 0;
 
@@ -1077,12 +1080,7 @@ int __kmem_cache_free(struct pcb_t *caller, int rgid, int cache_pool_id)
     struct kcache_pool_struct *pool = &krnl_mm->kcpooltbl[cache_pool_id];
     addr_t addr = rgnode->rg_start;
 
-    addr_t required_size = pool->size * KCACHE_MIN_OBJS + pool->align;
-#ifdef MM64
-    addr_t slab_size = PAGING64_PAGE_ALIGNSZ(required_size);
-#else
-    addr_t slab_size = PAGING_PAGE_ALIGNSZ(required_size);
-#endif
+    addr_t slab_size = pool->size;
 
     struct slab_struct *slab = pool->slabs;
     int found = 0;
@@ -1091,9 +1089,9 @@ int __kmem_cache_free(struct pcb_t *caller, int rgid, int cache_pool_id)
         if (addr >= slab->addr && addr < slab->addr + slab_size)
         {
             addr_t offset = addr - slab->addr;
-            if ((offset % pool->size) == 0)
+            if ((offset % pool->align) == 0)
             {
-                int obj_idx = offset / pool->size;
+                int obj_idx = offset / pool->align;
                 slab->free_list[obj_idx].next = (int)slab->storage;
                 slab->storage = obj_idx;
                 found = 1;
