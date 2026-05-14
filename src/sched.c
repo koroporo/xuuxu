@@ -95,6 +95,27 @@ struct pcb_t *sched_find_proc_by_pid(struct krnl_t *krnl, uint32_t pid)
 	return NULL;
 }
 
+void sched_remove_proc(struct pcb_t *proc)
+{
+	if (proc == NULL || proc->krnl == NULL)
+	{
+		return;
+	}
+
+	pthread_mutex_lock(&sched_lock);
+	purgequeue(proc->krnl->running_list, proc);
+#if defined(MLQ_SCHED)
+	for (int i = 0; i < MAX_PRIO; i++)
+	{
+		purgequeue(&mlq_ready_queue[i], proc);
+	}
+#else
+	purgequeue(proc->krnl->ready_queue, proc);
+	purgequeue(&run_queue, proc);
+#endif
+	pthread_mutex_unlock(&sched_lock);
+}
+
 void init_scheduler(void) {
 #ifdef MLQ_SCHED
     int i ;

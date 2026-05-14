@@ -11,6 +11,7 @@
 
 int queue_empty(void);
 struct pcb_t *sched_find_proc_by_pid(struct krnl_t *krnl, uint32_t pid);
+void sched_remove_proc(struct pcb_t *proc);
 
 void init_scheduler(void);
 void finish_scheduler(void);
@@ -25,4 +26,3 @@ void put_proc(struct pcb_t * proc);
 void add_proc(struct pcb_t * proc);
 
 #endif
-
