@@ -196,7 +196,15 @@ static void *ld_routine(void *args)
 		init_mm(proc->mm, proc);
 
 #ifdef MLQ_SCHED
-		proc->prio = ld_processes.prio[i];
+		/* If priority is not provided in config (default -1), use process's priority */
+		if (ld_processes.prio[i] == -1)
+		{
+			proc->prio = proc->priority;
+		}
+		else
+		{
+			proc->prio = ld_processes.prio[i];
+		}
 #endif
 		while (current_time() < ld_processes.start_time[i])
 		{
@@ -206,7 +214,7 @@ static void *ld_routine(void *args)
 		display_time();
 		#endif
 		printf("\tLoaded a process at %s, PID: %d PRIO: %ld\n",
-			   ld_processes.path[i], proc->pid, ld_processes.prio[i]);
+			   ld_processes.path[i], proc->pid, proc->prio);
 		add_proc(proc);
 		free(ld_processes.path[i]);
 		i++;
@@ -282,7 +290,7 @@ static void read_config(const char *path)
 		}
 		if (fields == 2)
 		{
-			ld_processes.prio[i] = 0;
+			ld_processes.prio[i] = -1;
 		}
 		if (ld_processes.prio[i] >= MAX_PRIO)
 		{
