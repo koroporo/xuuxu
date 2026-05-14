@@ -265,25 +265,3 @@ void add_proc(struct pcb_t * proc) {
 	pthread_mutex_unlock(&sched_lock);	
 }
 #endif
-
-void print_running_list(void)
-{
-	pthread_mutex_lock(&sched_lock);
-	printf("\t[RUNNING LIST]: ");
-	if (running_list.size == 0)
-	{
-		printf("(empty)\n");
-	}
-	else
-	{
-		for (int i = 0; i < running_list.size; i++)
-		{
-			if (running_list.proc[i] != NULL)
-			{
-				printf("PID:%d ", running_list.proc[i]->pid);
-			}
-		}
-		printf("\n");
-	}
-	pthread_mutex_unlock(&sched_lock);
-}
