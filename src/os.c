@@ -107,6 +107,7 @@ static void *cpu_routine(void *args)
 			/* The porcess has finish it job */
 			printf("\tCPU %d: Processed %2d has finished\n",
 				   id, proc->pid);
+			sched_remove_proc(proc);
 			free(proc);
 			proc = get_proc();
 			time_left = 0;
@@ -272,7 +273,26 @@ static void read_config(const char *path)
 		strcat(ld_processes.path[i], "input/proc/");
 		char proc[100];
 #ifdef MLQ_SCHED
-		fscanf(file, "%lu %s %lu\n", &ld_processes.start_time[i], proc, &ld_processes.prio[i]);
+		char line[256];
+		if (fgets(line, sizeof(line), file) == NULL)
+		{
+			printf("Cannot read process entry %d from %s\n", i, path);
+			exit(1);
+		}
+		int fields = sscanf(line, "%lu %99s %lu", &ld_processes.start_time[i], proc, &ld_processes.prio[i]);
+		if (fields < 2)
+		{
+			printf("Invalid process entry %d in %s\n", i, path);
+			exit(1);
+		}
+		if (fields == 2)
+		{
+			ld_processes.prio[i] = 0;
+		}
+		if (ld_processes.prio[i] >= MAX_PRIO)
+		{
+			ld_processes.prio[i] = MAX_PRIO - 1;
+		}
 #else
 		fscanf(file, "%lu %s\n", &ld_processes.start_time[i], proc);
 #endif
