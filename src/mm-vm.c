@@ -87,7 +87,7 @@ struct vm_rg_struct *get_vm_area_node_at_sbrk_core(struct pcb_t *caller, int vma
 		return NULL;
 	}
 	newrg->rg_start = cur_vma->sbrk;
-	newrg->rg_end = newrg->rg_start + alignedsz;
+	newrg->rg_end = newrg->rg_start + size;
 	newrg->rg_next = NULL;
 	newrg->mode_bit = is_kernel ? 0 : 1;
 	return newrg;
@@ -195,25 +195,15 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int is_ke
 	struct vm_area_struct *cur_vma;
 	addr_t inc_amt, old_end, old_sbrk;
 	int incnumpage;
-	// if (newrg == NULL)
-	// {
-	// 	return -1;
-	// }
-#if defined(MM64)
-	inc_amt = PAGING64_PAGE_ALIGNSZ(inc_sz);
-	incnumpage = inc_amt / PAGING64_PAGESZ;
-#else
-	inc_amt = PAGING_PAGE_ALIGNSZ(inc_sz);
-	incnumpage = inc_amt / PAGING_PAGESZ;
-#endif
+
 	if (is_kernel == 1)
 	{
-		area = k_get_vm_area_node_at_sbrk(caller, vmaid, inc_sz, inc_amt);
+		area = k_get_vm_area_node_at_sbrk(caller, vmaid, inc_sz, inc_sz);
 		cur_vma = get_vma_by_num(caller->krnl->mm, vmaid);
 	}
 	else
 	{
-		area = get_vm_area_node_at_sbrk(caller, vmaid, inc_sz, inc_amt);
+		area = get_vm_area_node_at_sbrk(caller, vmaid, inc_sz, inc_sz);
 		cur_vma = get_vma_by_num(caller->mm, vmaid);
 	}
 
@@ -229,14 +219,31 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int is_ke
 
 	old_end = cur_vma->vm_end;
 	old_sbrk = cur_vma->sbrk;
+
+	if (area->rg_end <= old_end)
+	{
+		cur_vma->sbrk = area->rg_end;
+		free(area);
+		return 0;
+	}
+
+	addr_t needed_sz = area->rg_end - old_end;
+#if defined(MM64)
+	inc_amt = PAGING64_PAGE_ALIGNSZ(needed_sz);
+	incnumpage = inc_amt / PAGING64_PAGESZ;
+#else
+	inc_amt = PAGING_PAGE_ALIGNSZ(needed_sz);
+	incnumpage = inc_amt / PAGING_PAGESZ;
+#endif
+
 	int validate;
 	if (is_kernel == 1)
 	{
-		validate = k_validate_overlap_vm_area(caller, vmaid, area->rg_start, area->rg_end);
+		validate = k_validate_overlap_vm_area(caller, vmaid, old_end, old_end + inc_amt);
 	}
 	else
 	{
-		validate = validate_overlap_vm_area(caller, vmaid, area->rg_start, area->rg_end);
+		validate = validate_overlap_vm_area(caller, vmaid, old_end, old_end + inc_amt);
 	}
 	if (validate < 0)
 	{
@@ -248,11 +255,11 @@ int inc_vma_limit_core(struct pcb_t *caller, int vmaid, addr_t inc_sz, int is_ke
 	int vm_map_result;
 	if (is_kernel == 1)
 	{
-		vm_map_result = vm_map_kernel(caller, area->rg_start, area->rg_end, old_end, incnumpage, &newrg); // May be used old_end or area->rg_start, the old versions of this assig used old_end
+		vm_map_result = vm_map_kernel(caller, old_end, old_end + inc_amt, old_end, incnumpage, &newrg);
 	}
 	else
 	{
-		vm_map_result = vm_map_range(caller, area->rg_start, area->rg_end, old_end, incnumpage, &newrg);
+		vm_map_result = vm_map_range(caller, old_end, old_end + inc_amt, old_end, incnumpage, &newrg);
 	}
 	if (vm_map_result != 0)
 	{
