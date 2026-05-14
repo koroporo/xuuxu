@@ -250,7 +250,7 @@ int liballoc(struct pcb_t *proc, addr_t size, uint32_t reg_index)
     printf("\tVirtual Address: " FORMATX_ADDR "\n", (void *)addr);
     dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
-    print_pgtbl(proc, 0, -1); // print max TBL
+    print_pgtbl(proc, addr, -1); // print max TBL
 #endif
 #endif
 
@@ -345,7 +345,7 @@ int libfree(struct pcb_t *proc, uint32_t reg_index)
     /* TODO dump IO content (if needed) */
     printf("\t[LIBFREE] PID %d at register %u\n", proc->pid, reg_index);
 #ifdef PAGETBL_DUMP
-    print_pgtbl(proc, 0, -1); // print max TBL
+    print_pgtbl(proc, addr, -1); // print max TBL
 #endif
 #endif
     return val;
@@ -655,7 +655,7 @@ int libread(
     printf("\t[LIBREAD] PID %d: read %c from reg[%d]+offset[%ld] ", proc->pid, data, source, offset);
     dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
-    print_pgtbl(proc, 0, -1); // print max TBL
+    print_pgtbl(proc, address, -1); // print max TBL
 #endif
 #endif
 
@@ -727,7 +727,7 @@ int libwrite(
     printf("\t[LIBWRITE] PID %d: data %c written to Reg[%u]+offset[%lu] - " FORMATX_ADDR "\n", proc->pid, data, destination, offset, (void *)address);
     dump_mm_layout(proc, "User", 0);
 #ifdef PAGETBL_DUMP
-    print_pgtbl(proc, 0, -1); // print max TBL
+    print_pgtbl(proc, address, -1); // print max TBL
 #endif
 #endif
 
