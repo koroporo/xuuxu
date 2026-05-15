@@ -340,17 +340,17 @@ addr_t vm_map_range(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t map
 	}
 	return vm_map_ram(caller, astart, aend, mapstart, incpgnum, ret_rg);
 }
-static void put_back_contiguous_frames(struct memphy_struct *mram, struct framephy_struct *frm_lst)
-{
-	struct framephy_struct *fpit = frm_lst;
-	while (fpit != NULL)
-	{
-		struct framephy_struct *next = fpit->fp_next;
-		MEMPHY_put_freefp(mram, fpit->fpn);
-		free(fpit);
-		fpit = next;
-	}
-}
+// static void put_back_contiguous_frames(struct memphy_struct *mram, struct framephy_struct *frm_lst)
+// {
+// 	struct framephy_struct *fpit = frm_lst;
+// 	while (fpit != NULL)
+// 	{
+// 		struct framephy_struct *next = fpit->fp_next;
+// 		MEMPHY_put_freefp(mram, fpit->fpn);
+// 		free(fpit);
+// 		fpit = next;
+// 	}
+// }
 addr_t vm_map_kernel(struct pcb_t *caller, addr_t astart, addr_t aend, addr_t mapstart, int incpgnum, struct vm_rg_struct *ret_rg)
 {
 	addr_t mapsz;

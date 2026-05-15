@@ -213,7 +213,7 @@ static void *ld_routine(void *args)
 		#ifdef TIME_DEBUG
 		display_time();
 		#endif
-		printf("\tLoaded a process at %s, PID: %d PRIO: %ld\n",
+		printf("\tLoaded a process at %s, PID: %d PRIO: %d\n",
 			   ld_processes.path[i], proc->pid, proc->prio);
 		add_proc(proc);
 		free(ld_processes.path[i]);
