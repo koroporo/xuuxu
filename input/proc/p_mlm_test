@@ -1,0 +1,7 @@
+1 6
+alloc 2097152 0
+alloc 1071644672 1
+alloc 4096 2
+free 0
+free 1
+free 2

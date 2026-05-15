@@ -1,0 +1,15 @@
+1 14
+kmem_cache_create 128 32 5
+kmem_cache_alloc 0 5
+kmem_cache_alloc 3 5
+kmem_cache_create 256 64 67
+kmem_cache_alloc 2 5
+kmem_cache_alloc 2 67
+kmem_cache_alloc 2 5
+kmem_cache_alloc 2 5
+kmem_cache_create 256 64 69
+kmem_cache_alloc 2 5
+free 3
+kmem_cache_alloc 2 5
+kmem_cache_alloc 2 5
+kmem_cache_alloc 2 5
