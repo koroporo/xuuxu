@@ -19,7 +19,7 @@ plt.rcParams.update({
 
 def parse_input(input_filename):
     """
-    Đọc file input để lấy cấu hình hệ thống.
+    Parse input file to get system configuration.
     """
     num_cpus = 1
     try:
@@ -30,12 +30,12 @@ def parse_input(input_filename):
                 if len(parts) >= 2:
                     num_cpus = int(parts[1])
     except Exception as e:
-        print(f"Lỗi đọc file input: {e}")
+        print(f"Error reading input file: {e}")
     return num_cpus
 
 def parse_log(filename, num_cpus):
     """
-    Đọc file log và xây dựng lịch chạy cho mỗi CPU.
+    Parse log file and build schedule for each CPU.
     """
     cpu_state: dict[int, int | None] = {i: None for i in range(num_cpus)}
     cpu_schedule: dict[int, dict[int, int | None]] = {i: {} for i in range(num_cpus)}
@@ -91,7 +91,7 @@ def parse_log(filename, num_cpus):
 
 def merge_schedule(schedule):
     """
-    Gom các time slot liên tiếp.
+    Merge consecutive time slots.
     """
     intervals = []
     sorted_times = sorted(schedule.keys())
@@ -124,7 +124,6 @@ def generate_gantt_chart(input_file, log_file, out_img):
     Generate a single Gantt chart.
     """
     num_cpus = parse_input(input_file)
-    print(f"[INFO] {os.path.basename(log_file)}: Hệ thống được cấu hình với {num_cpus} CPU.")
     
     cpu_schedule = parse_log(log_file, num_cpus)
     
@@ -171,18 +170,18 @@ def generate_gantt_chart(input_file, log_file, out_img):
                            facecolors=color, edgecolor='black', linewidth=0.8)
             
             if proc is not None:
-                # Giữ nguyên chữ màu đen để dễ đọc trên nền sáng
+                # Display process label
                 ax.text(start + duration/2, y + row_height/2, f"P{proc}",
                         ha='center', va='center', color='black', fontsize=15)
                 
-    # Đặt tick (số) thẳng hàng với ranh giới của các time slot
+    # Set ticks aligned with time slot boundaries
     ax.set_xticks(range(max_time + 1))
     ax.set_xticklabels([str(x) for x in range(max_time + 1)])
     
-    # Ẩn các dấu gạch dọc nhô ra ở trục X
+    # Hide tick marks on X axis
     ax.tick_params(axis='x', which='both', length=0)
     
-    # Bật lưới gióng nét đứt tại các ranh giới (ticks chính)
+    # Enable grid at tick boundaries
     ax.grid(axis='x', linestyle='--', color='gray', alpha=0.5)
     
     ax.set_xlabel("Time Slot")
@@ -194,7 +193,7 @@ def generate_gantt_chart(input_file, log_file, out_img):
     plt.tight_layout()
     plt.savefig(out_img, dpi=300)
     plt.close()
-    print(f"[SUCCESS] Đã xuất biểu đồ ra file: {out_img}")
+    print(f"Gantt chart saved to: {out_img}")
 
 def main():
     if len(sys.argv) == 4:
@@ -220,9 +219,6 @@ def main():
         
         config_files.sort()
         
-        print("=" * 60)
-        print("Generating Gantt charts for all run outputs...")
-        print("=" * 60)
         
         for config_name in config_files:
             input_path = os.path.join(input_dir, config_name)
@@ -238,9 +234,7 @@ def main():
             else:
                 print(f"[SKIP] Output file not found: {output_path}")
         
-        print("=" * 60)
-        print(f"All charts have been saved to: {charts_dir}/")
-        print("=" * 60)
+        print(f"All charts saved to: {charts_dir}/")
     else:
         print("Usage:")
         print("  Single chart:  python gantt.py <input_file> <log_file> <output_image>")
